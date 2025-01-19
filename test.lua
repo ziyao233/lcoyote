@@ -2,6 +2,8 @@ local bluetooth		= require "lcoyote.bluetooth";
 
 bluetooth.init();
 
-for path, dev in pairs(bluetooth.getDevices()) do
-	print(("%s: %s"):format(path, dev["org.bluez.Device1"].Name));
-end
+local devpath = next(bluetooth.getDevices());
+
+local readBat = bluetooth.getCharacteristic(devpath, "00001500-0000-1000-8000-00805f9b34fb");
+
+print(readBat:readValue()[1]);

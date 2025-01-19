@@ -108,18 +108,17 @@ getObjects()
 --	FIXME: ldbus doesn't claim the reference to the message in iterators,
 --	workaround this or we may get a segfault.
 --	local res = decodeMessage(dbusSession:send_with_reply_and_block(query));
-	local msg = dbusSession:send_with_reply_and_block(query);
-	local res = decodeMessage(msg);
+	local reply = dbusSession:send_with_reply_and_block(query);
+	local res = decodeMessage(reply);
 
 	return res;
 end
 
 local function
 getDevices()
-	local objs = getObjects();
 	local devices = {};
 
-	for k, v in pairs(objs) do
+	for k, v in pairs(getObjects()) do
 		local path = splitPath(k);
 
 		if path[#path]:match("^dev_[_0-9A-F]+$") then
@@ -131,7 +130,53 @@ getDevices()
 
 end
 
+local charMeta = {};
+charMeta.__index = charMeta;
+
+-- TODO: Support options
+charMeta.readValue = function(self)
+	local interface <const> = "org.bluez.GattCharacteristic1";
+	local query = dmessage.new_method_call("org.bluez", self.objpath,
+					       interface, "ReadValue");
+
+	local iter = query:iter_init_append();
+	local subiter = iter:open_container("a", "{sv}");
+	iter:close_container(subiter);
+
+	local reply = assert(dbusSession:send_with_reply_and_block(query));
+	local res = decodeMessage(reply);
+
+	return res;
+end
+
+-- FIXME: We could have different services with the same charUUID, it isn't
+-- the case for DGLab Coyote though.
+local function
+getCharacteristic(devpath, charUUID)
+	local services = {};
+
+	for k, v in pairs(getObjects()) do
+		if not k:find(devpath) then
+			goto continue;
+		end
+
+		local path = splitPath(k);
+		if not path[#path]:match("^char[0-9a-f]+$") then
+			goto continue;
+		end
+
+		if v["org.bluez.GattCharacteristic1"].UUID == charUUID then
+			local char = { objpath = k };
+			return setmetatable(char, charMeta);
+		end
+	::continue::
+	end
+
+	return nil;
+end
+
 return {
-	init		= init,
-	getDevices	= getDevices,
+	init			= init,
+	getDevices		= getDevices,
+	getCharacteristic	= getCharacteristic,
        };
