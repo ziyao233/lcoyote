@@ -149,6 +149,25 @@ charMeta.readValue = function(self)
 	return res;
 end
 
+-- TODO: Support options
+charMeta.writeValue = function(self, value)
+	local interface <const> = "org.bluez.GattCharacteristic1";
+	local query = dmessage.new_method_call("org.bluez", self.objpath,
+					       interface, "WriteValue");
+
+	local iter = query:iter_init_append();
+	local subiter = iter:open_container("a", "y");
+	for i = 1, #value do
+		subiter:append_basic(math.tointeger(value[i]), 'y');
+	end
+	iter:close_container(subiter);
+
+	subiter = iter:open_container("a", "{sv}");
+	iter:close_container(subiter);
+
+	assert(dbusSession:send_with_reply_and_block(query));
+end
+
 -- FIXME: We could have different services with the same charUUID, it isn't
 -- the case for DGLab Coyote though.
 local function
